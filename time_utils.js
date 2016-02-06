@@ -44,4 +44,4 @@ module.exports = {
     filterEvents: filterEvents,
     filterEventsInDay: filterEventsInDay,
     filterEventsInWeek: filterEventsInWeek,
-}
+};
