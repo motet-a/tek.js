@@ -31,7 +31,7 @@ function Student(json) {
         city: json.location,
     }
     this.promotion = json.promo;
-    this.close = json.close;
+    this.closed = json.close;
     this.own = false;
 };
 
@@ -200,6 +200,24 @@ function Module(json) {
     }
 }
 
+Module.prototype.toString = function () {
+    var s = ('shortName: ' + this.shortName + '\n' +
+             'name: ' + this.name + '\n' +
+             'year: ' + this.year + '\n' +
+             'location: ' + this.location + '\n' +
+             'credits: ' + this.credits + '\n' +
+             'studentCredits: ' + this.studentCredits + '\n' +
+             'begin: ' + this.begin.calendar() + '\n' +
+             'end: ' + this.end.calendar() + '\n');
+
+    s += 'activities:\n'
+    for (var i = 0; i < this.activities.length; i++) {
+        var activity = this.activities[i];
+        s += '    ' + activity.shortName + ' ' + activity.name + '\n';
+    }
+    return s;
+}
+
 Module.prototype.contains = function (moment) {
     return timeUtils.isBetweenInc(moment, this.begin, this.end);
 }
@@ -285,6 +303,15 @@ Module.getIDs = function (session, callback) {
 function Epitech(ownStudent, modules, json) {
     this.ownStudent = ownStudent;
     this.modules = modules;
+}
+
+Epitech.prototype.getModule = function (shortName) {
+    for (var i = 0; i < this.modules.length; i++) {
+        var module = this.modules[i];
+        if (module.shortName == shortName)
+            return module;
+    }
+    return null;
 }
 
 Epitech.prototype.getActivities = function () {
@@ -373,6 +400,7 @@ Epitech.getEpitechRequest = function (session) {
 
     return epitechRequest;
 }
+
 
 
 module.exports = {
