@@ -1,0 +1,21 @@
+{
+  "name": "Tek.js",
+  "version": "0.0.1",
+  "description": "A JavaScript API for intra.epitech.eu",
+  "main": "tek.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/motet-a/tek.js.git"
+  },
+  "keywords": [
+    "epitech"
+  ],
+  "author": "motet_a",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/motet-a/tek.js/issues"
+  }
+}
