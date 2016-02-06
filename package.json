@@ -1,5 +1,5 @@
 {
-  "name": "Tek.js",
+  "name": "tek.js",
   "version": "0.0.1",
   "description": "A JavaScript API for intra.epitech.eu",
   "main": "tek.js",
@@ -17,5 +17,11 @@
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/motet-a/tek.js/issues"
+  },
+  "dependencies": {
+    "https": "^1.0.0",
+    "moment": "^2.11.2",
+    "querystring": "^0.2.0",
+    "read": "^1.0.7"
   }
 }
