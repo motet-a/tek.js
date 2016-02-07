@@ -12,6 +12,11 @@ function parseDate(string) {
     return m;
 }
 
+function parseTimeDuration(string) {
+    var m = Moment.duration(string, 'HH:mm:ss');
+    return m;
+}
+
 function parseDateTime(string) {
     var m = Moment(string, 'YYYY-MM-DD HH:mm:ss');
     if (!m.isValid())
@@ -98,6 +103,14 @@ function ModuleID(year, shortName, location) {
     this.location = location;
 }
 
+ModuleID.prototype.toString = function () {
+    return this.year + '/' + this.shortName + '/' + this.location;
+}
+
+ModuleID.prototype.equals = function (other) {
+    return this.toString() === other.toString();
+}
+
 ModuleID.create = function () {
     var params = Array.prototype.slice.call(arguments);
 
@@ -124,6 +137,19 @@ ModuleID.fromArray = function (array) {
         throw new Error('The array length must be 3');
     }
     return new ModuleID(array[0], array[1], array[2]);
+}
+
+ModuleID.fromString = function (path) {
+    var array = path.split('/');
+    if (array.length != 3) {
+        throw new Error('Invalid path: ' + array);
+    }
+
+    var year = parseInt(array[0]);
+    if (isNaN(year)) {
+        throw new Error('Invalid year: ' + array[0]);
+    }
+    return new ModuleID(year, array[1], array[2]);
 }
 
 ModuleID.fromPath = function (path) {
@@ -168,11 +194,24 @@ function Activity(module, json) {
     this.begin = parseDateTime(json.begin);
     this.end = parseDateTime(json.end);
 
+    this.time = parseTimeDuration(json.nb_hour);
+
     this.events = [];
     for (var i = 0; i < json.events.length; i++) {
         var event = new Event(this, json.events[i]);
         this.events.push(event);
     }
+}
+
+Activity.prototype.toString = function () {
+    var s = ('shortName: ' + this.shortName + '\n' +
+             'name: ' + this.name + '\n' +
+             'typeName: ' + this.typeName + '\n' +
+             'moduleName: ' + this.module.name + '\n' +
+             'moduleID: ' + this.module.getID() + '\n' +
+             'begin: ' + this.begin.calendar() + '\n' +
+             'end: ' + this.end.calendar() + '\n')
+    return s;
 }
 
 Activity.prototype.contains = function (moment) {
@@ -182,13 +221,17 @@ Activity.prototype.contains = function (moment) {
 
 
 function Module(json) {
-    this.year = json.scolaryear;
-    this.shortName = json.codemodule;
-    this.location = json.codeinstance;
+    this.id = new ModuleID(json.scolaryear,
+                           json.codemodule,
+                           json.codeinstance);
+
     this.name = json.title;
     this.description = json.description;
+    this.skills = json.competence;
+
     this.credits = json.credits;
     this.studentCredits = json.user_credits;
+    this.studentRegistered = json.student_registered === 1;
 
     this.begin = json.begin === null ? null : parseDate(json.begin);
     this.end = json.begin === null ? null : parseDate(json.end);
@@ -200,15 +243,26 @@ function Module(json) {
     }
 }
 
+Module.prototype.getActivity = function (shortName) {
+    for (var i = 0; i < this.activities.length; i++) {
+        var activity = this.activities[i];
+        if (activity.shortName === shortName)
+            return activity;
+    }
+    return null;
+}
+
 Module.prototype.toString = function () {
-    var s = ('shortName: ' + this.shortName + '\n' +
+    var begin = this.begin === null ? null : this.begin.calendar();
+    var end = this.end === null ? null : this.end.calendar();
+
+    var s = ('id: ' + this.getID() + '\n' +
              'name: ' + this.name + '\n' +
-             'year: ' + this.year + '\n' +
-             'location: ' + this.location + '\n' +
+             (begin ? 'begin: ' + this.begin.calendar() + '\n' : '') +
+             (end ? 'end: ' + this.end.calendar() + '\n' : '') +
              'credits: ' + this.credits + '\n' +
              'studentCredits: ' + this.studentCredits + '\n' +
-             'begin: ' + this.begin.calendar() + '\n' +
-             'end: ' + this.end.calendar() + '\n');
+             'studentRegistered: ' + this.studentRegistered + '\n');
 
     s += 'activities:\n'
     for (var i = 0; i < this.activities.length; i++) {
@@ -223,7 +277,7 @@ Module.prototype.contains = function (moment) {
 }
 
 Module.prototype.getID = function () {
-    return new ModuleID(this.year, this.shortName, this.location);
+    return this.id;
 }
 
 Module.prototype.getEvents = function () {
@@ -238,9 +292,7 @@ Module.prototype.getEvents = function () {
 Module.get = function (session, moduleID, callback) {
     moduleID = ModuleID.create(moduleID);
 
-    var path = 'module/' + moduleID.year +
-        '/' + moduleID.shortName +
-        '/' + moduleID.location;
+    var path = 'module/' + moduleID
     session.request(path, function (error, text) {
         if (error)
             return callback(error, null);
@@ -305,11 +357,21 @@ function Epitech(ownStudent, modules, json) {
     this.modules = modules;
 }
 
-Epitech.prototype.getModule = function (shortName) {
+Epitech.prototype.getModule = function (id) {
     for (var i = 0; i < this.modules.length; i++) {
         var module = this.modules[i];
-        if (module.shortName == shortName)
+        if (module.id.equals(id))
             return module;
+    }
+    return null;
+}
+
+Epitech.prototype.getActivity = function (shortName) {
+    for (var i = 0; i < this.modules.length; i++) {
+        var module = this.modules[i];
+        var activity = module.getActivity(shortName);
+        if (activity)
+            return activity;
     }
     return null;
 }

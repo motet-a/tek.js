@@ -72,18 +72,60 @@ function printStudent(epitech, session, args, callback) {
     });
 }
 
+function printModules(epitech, session, args, callback) {
+    for (var i = 0; i < epitech.modules.length; i++) {
+        var module = epitech.modules[i];
+        console.info(module.id + '\t' + module.name);
+    }
+    callback(epitech, session);
+}
+
 function printModule(epitech, session, args, callback) {
     if (args.length === 0) {
-        console.warn('Expected a module name');
+        console.warn('Expected a module ID');
         callback(epitech, session);
         return;
     }
 
-    var module = epitech.getModule(args[0]);
+    var moduleID;
+    try {
+        moduleID = tek.ModuleID.fromString(args[0]);
+    } catch (e) {
+        console.warn('Invalid module ID: ' + e);
+        callback(epitech, session);
+        return;
+    }
+
+    var module = epitech.getModule(moduleID);
     if (module) {
         console.log(module.toString());
     } else {
         console.warn('Unknown module ' + args[0]);
+    }
+    callback(epitech, session);
+}
+
+function printActivities(epitech, session, args, callback) {
+    var activities = epitech.getActivities();
+    for (var i = 0; i < activities.length; i++) {
+        var activity = activities[i];
+        console.info(activity.shortName + '\t' + activity.name);
+    }
+    callback(epitech, session);
+}
+
+function printActivity(epitech, session, args, callback) {
+    if (args.length === 0) {
+        console.warn('Expected an activity name');
+        callback(epitech, session);
+        return;
+    }
+
+    var activity = epitech.getActivity(args[0]);
+    if (activity) {
+        console.log(activity.toString());
+    } else {
+        console.warn('Unknown activity ' + args[0]);
     }
     callback(epitech, session);
 }
@@ -93,6 +135,10 @@ var commands = {
     ownstudent: printOwnStudent,
     student: printStudent,
     module: printModule,
+    modules: printModules,
+    activities: printActivities,
+    activity: printActivity,
+    acti: printActivity,
 };
 
 function runCommand(epitech, session, args, callback) {
