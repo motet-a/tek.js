@@ -1,10 +1,19 @@
 var https = require('https');
 var querystring = require('querystring');
 
+var _model = require('./model.js');
+var defineGetter = _model.defineGetter;
+var defineSimpleGetter = _model.defineSimpleGetter;
+
+
+function NetworkError(message) {
+
+}
+
 
 function Session(login, password) {
-    this.login = login;
-    this.password = password;
+    defineSimpleGetter(this, 'login', login);
+    defineSimpleGetter(this, 'password', password);
 }
 
 Session.prototype.getURLEncodedContent = function () {
@@ -54,6 +63,22 @@ Session.prototype.request = function (path, callback) {
     req.write(this.getURLEncodedContent());
 
     req.end();
+}
+
+Session.prototype.requestJSON = function (path, callback) {
+    this.request(path, function (error, text) {
+        if (error)
+            return callback(error, null);
+
+        var object;
+        try {
+            object = JSON.parse(text)
+        } catch (e) {
+            return callback(e, null);
+        }
+
+        callback(null, object);
+    });
 }
 
 module.exports.Session = Session;

@@ -51,39 +51,46 @@ function printEpitech(epitech) {
 }
 
 
-function printOwnStudent(epitech, session, args, callback) {
+function printOwnStudent(epitech, args, callback) {
     console.log(epitech.ownStudent);
-    callback(epitech, session);
+    callback(epitech);
 }
 
 
-function printStudent(epitech, session, args, callback) {
+function printStudent(epitech, args, callback) {
     if (args.length === 0) {
         console.log(epitech.ownStudent);
         return;
     }
 
-    tek.Student.get(session, args[0], function (error, student) {
+    tek.Student.get(epitech.session, args[0], function (error, student) {
         if (error)
             console.log('Error');
         else
             console.log(student);
-        callback(epitech, session);
+        callback(epitech);
     });
 }
 
-function printModules(epitech, session, args, callback) {
-    for (var i = 0; i < epitech.modules.length; i++) {
-        var module = epitech.modules[i];
-        console.info(module.id + '\t' + module.name);
-    }
-    callback(epitech, session);
+function printModules(epitech, args, callback) {
+    epitech.getModulesIDs(function (error, ids) {
+        if (error) {
+            console.warn(error);
+            callback(epitech);
+            return;
+        }
+
+        for (var i = 0; i < ids.length; i++)
+            console.info(ids[i].toString());
+
+        callback(epitech);
+    });
 }
 
-function printModule(epitech, session, args, callback) {
+function printModule(epitech, args, callback) {
     if (args.length === 0) {
         console.warn('Expected a module ID');
-        callback(epitech, session);
+        callback(epitech);
         return;
     }
 
@@ -92,32 +99,35 @@ function printModule(epitech, session, args, callback) {
         moduleID = tek.ModuleID.fromString(args[0]);
     } catch (e) {
         console.warn('Invalid module ID: ' + e);
-        callback(epitech, session);
+        callback(epitech);
         return;
     }
 
-    var module = epitech.getModule(moduleID);
-    if (module) {
+    var module = epitech.getModule(moduleID, function (error, module) {
+        if (error !== null) {
+            console.warn('Error: ' + error);
+            callback(epitech);
+            return;
+        }
+
         console.log(module.toString());
-    } else {
-        console.warn('Unknown module ' + args[0]);
-    }
-    callback(epitech, session);
+        callback(epitech);
+    });
 }
 
-function printActivities(epitech, session, args, callback) {
+function printActivities(epitech, args, callback) {
     var activities = epitech.getActivities();
     for (var i = 0; i < activities.length; i++) {
         var activity = activities[i];
         console.info(activity.shortName + '\t' + activity.name);
     }
-    callback(epitech, session);
+    callback(epitech);
 }
 
-function printActivity(epitech, session, args, callback) {
+function printActivity(epitech, args, callback) {
     if (args.length === 0) {
         console.warn('Expected an activity name');
-        callback(epitech, session);
+        callback(epitech);
         return;
     }
 
@@ -127,7 +137,7 @@ function printActivity(epitech, session, args, callback) {
     } else {
         console.warn('Unknown activity ' + args[0]);
     }
-    callback(epitech, session);
+    callback(epitech);
 }
 
 var commands = {
@@ -141,30 +151,33 @@ var commands = {
     acti: printActivity,
 };
 
-function runCommand(epitech, session, args, callback) {
+function runCommand(epitech, args, callback) {
     var name = args[0];
     args.shift();
 
     var command = commands[name];
 
     if (command) {
-        command(epitech, session, args, callback);
+        command(epitech, args, callback);
     } else {
         console.warn('Invalid command');
-        callback(epitech, session);
+        callback(epitech);
     }
 }
 
-function readAndRunCommand(epitech, session) {
+function readAndRunCommand(epitech) {
+    if (!(epitech instanceof tek.Epitech))
+        throw new Error();
+
     readCommand(function (commandString) {
         var commandArray = commandString.trim().split(' ');
 
         if (commandArray.length > 0 && commandArray[0] !== '') {
             if (commandArray[0] === 'exit')
                 return;
-            runCommand(epitech, session, commandArray, readAndRunCommand);
+            runCommand(epitech, commandArray, readAndRunCommand);
         } else {
-            readAndRunCommand(epitech, session);
+            readAndRunCommand(epitech);
         }
     });
 }
@@ -172,31 +185,23 @@ function readAndRunCommand(epitech, session) {
 function fetchEpitech(login, password) {
     var session = new tek.Session(login, password);
 
-    var epitechRequest = tek.Epitech.getEpitechRequest(session);
-    epitechRequest.on('end', function (epitech) {
-        process.stdout.write('\r');
-        readAndRunCommand(epitech, session);
-    });
-    epitechRequest.on('error', function (error) {
-        process.stdout.write('\r');
-        console.log('Error:');
-        console.log(error);
-    });
-    epitechRequest.on('update', function () {
-        if (epitechRequest.isFinished())
+    tek.Epitech.get(session, function (error, epitech) {
+        if (error) {
+            console.log('Error:');
+            console.log(error);
             return;
-        var pf = epitechRequest.getProgressFloat();
-        process.stdout.write('\r');
-        process.stdout.write(Math.round(pf * 100) + '%');
+        }
+
+        readAndRunCommand(epitech);
     });
 }
 
 function main() {
-    readLogin(function(error, login) {
+    readLogin(function (error, login) {
         if (error)
             return;
 
-        readPassword(function(error, password) {
+        readPassword(function (error, password) {
             if (error)
                 return;
 

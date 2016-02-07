@@ -1,88 +1,68 @@
 
 var Moment = require('moment');
-var Session = require('./session.js').Session;
-var EpitechRequest = require('./epitech_request.js').EpitechRequest;
 var timeUtils = require('./time_utils.js');
 
+var _model = require('./model.js');
+var Model = _model.Model;
+var defineGetter = _model.defineGetter;
+var defineSimpleGetter = _model.defineSimpleGetter;
 
-function parseDate(string) {
-    var m = Moment(string, 'YYYY-MM-DD');
-    if (!m.isValid())
-        throw new Error('Invalid date');
-    return m;
-}
-
-function parseTimeDuration(string) {
-    var m = Moment.duration(string, 'HH:mm:ss');
-    return m;
-}
-
-function parseDateTime(string) {
-    var m = Moment(string, 'YYYY-MM-DD HH:mm:ss');
-    if (!m.isValid())
-        throw new Error('Invalid date');
-    return m;
-}
+var Session = require('./session.js').Session;
+var ModuleID = require('./module_id.js').ModuleID;
+var ActivityID = require('./activity_id.js').ActivityID;
 
 
 
-function Student(json) {
-    this.login = json.login;
-    this.email = json.internal_email;
-    this.firstName = json.firstname;
-    this.lastName = json.lastname;
-    this.picture = json.picture;
-    this.location = {
+function Student(epitech, json) {
+    Model.call(this, epitech);
+
+    defineSimpleGetter(this, 'login', json.login);
+    defineSimpleGetter(this, 'email', json.internal_email);
+
+    defineSimpleGetter(this, 'firstName', json.firstname);
+    defineSimpleGetter(this, 'lastName', json.lastname);
+
+    defineSimpleGetter(this, 'picture', json.picture);
+    defineSimpleGetter(this, 'location', {
         city: json.location,
-    }
-    this.promotion = json.promo;
-    this.closed = json.close;
-    this.own = false;
+    });
+    defineSimpleGetter(this, 'promotion', json.promotion);
+    defineSimpleGetter(this, 'closed', json.close);
+    defineSimpleGetter(this, 'own', false);
 };
 
-Student.get = function (session, login, callback) {
-    session.request('user/' + login, function (error, text) {
-
-        if (error) {
+Student.get = function (epitech, login, callback) {
+    var session = epitech.session;
+    session.requestJSON('user/' + login, function (error, json) {
+        if (error)
             return callback(error, null);
-        }
 
-        var json;
-        try {
-            json = JSON.parse(text);
-        } catch (e) {
-            return callback(e, null);
-        }
-
-        var student = new Student(json);
+        var student = new Student(epitech, json);
         callback(null, student);
     });
 }
 
 
 
-function OwnStudent(json) {
-    Student.call(this, json);
-    this.own = true;
-    this.closeReason = json.close_reason;
-    this.modules = [];
+function OwnStudent(epitech, json) {
+    Student.call(this, epitech, json);
+
+    defineSimpleGetter(this, 'own', true);
+    defineSimpleGetter(this, 'closeReason', json.close_reason);
+
+    var modulesIDs = [];
+    defineGetter(this, 'modulesIDs', function () {
+        return modulesIDs;
+    });
 }
 
-OwnStudent.get = function (session, callback) {
-    session.request('user/' + session.login, function (error, text) {
-
-        if (error) {
+OwnStudent.get = function (epitech, callback) {
+    var session = epitech.session;
+    session.requestJSON('user/' + session.login, function (error, json) {
+        if (error)
             return callback(error, null);
-        }
 
-        var json;
-        try {
-            json = JSON.parse(text);
-        } catch (e) {
-            return callback(e, null);
-        }
-
-        var student = new OwnStudent(json);
+        var student = new OwnStudent(epitech, json);
         callback(null, student);
     });
 }
@@ -90,93 +70,21 @@ OwnStudent.get = function (session, callback) {
 
 
 
-function isNumeric(n) {
-  return !isNaN(parseFloat(n)) && isFinite(n);
-}
-
-function ModuleID(year, shortName, location) {
-    if (!isNumeric(year)) {
-        throw new Error('year must be a number');
-    }
-    this.year = year;
-    this.shortName = shortName;
-    this.location = location;
-}
-
-ModuleID.prototype.toString = function () {
-    return this.year + '/' + this.shortName + '/' + this.location;
-}
-
-ModuleID.prototype.equals = function (other) {
-    return this.toString() === other.toString();
-}
-
-ModuleID.create = function () {
-    var params = Array.prototype.slice.call(arguments);
-
-    if (params.length == 1) {
-        var arg = params[0];
-
-        if (Array.isArray(arg))
-            return ModuleID.fromArray(arg);
-        else
-            return arg;
-    }
-
-    if (params.length != 3)
-        throw new Error('The argument count must be 3');
-
-    return new ModuleID(params[0], params[1], params[2]);
-}
-
-/**
- * array must be an array of three items: [year, shortName, location]
- */
-ModuleID.fromArray = function (array) {
-    if (array.length != 3) {
-        throw new Error('The array length must be 3');
-    }
-    return new ModuleID(array[0], array[1], array[2]);
-}
-
-ModuleID.fromString = function (path) {
-    var array = path.split('/');
-    if (array.length != 3) {
-        throw new Error('Invalid path: ' + array);
-    }
-
-    var year = parseInt(array[0]);
-    if (isNaN(year)) {
-        throw new Error('Invalid year: ' + array[0]);
-    }
-    return new ModuleID(year, array[1], array[2]);
-}
-
-ModuleID.fromPath = function (path) {
-    var array = path.split('/');
-    if (array.length != 6) {
-        throw new Error('Invalid path: ' + path);
-    }
-
-    array.shift();
-    array.shift();
-    var year = parseInt(array[0]);
-    if (isNaN(year)) {
-        throw new Error('Invalid year: ' + array[0]);
-    }
-    return new ModuleID(year, array[1], array[2]);
-}
 
 
+function Event(epitech, activityID, json) {
+    Model.call(this, epitech);
 
-function Event(activity, json) {
-    this.activity = activity;
-    this.begin = parseDateTime(json.begin);
-    this.end = parseDateTime(json.end);
-}
+    defineSimpleGetter(this, 'activityID', activityID);
 
-Event.prototype.getDuration = function () {
-    return Moment.duration(this.end.diff(this.begin));
+    var begin = timeUtils.parseDateTime(json.begin);
+    var end = timeUtils.parseDateTime(json.end);
+    defineSimpleGetter(this, 'begin', begin);
+    defineSimpleGetter(this, 'end', end);
+
+    defineGetter(this, 'duration', function () {
+        return Moment.duration(end.diff(begin));
+    });
 }
 
 Event.prototype.contains = function (moment) {
@@ -185,17 +93,23 @@ Event.prototype.contains = function (moment) {
 
 
 
-function Activity(module, json) {
-    this.shortName = json.codeacti;
-    this.name = json.title;
-    this.typeName = json.type_title;
-    this.module = module;
+function Activity(epitech, moduleID, json) {
 
-    this.begin = parseDateTime(json.begin);
-    this.end = parseDateTime(json.end);
+    var id = new ActivityID(moduleID, json.codeacti);
+    defineSimpleGetter(this, 'id', id);
 
-    this.time = parseTimeDuration(json.nb_hour);
+    defineSimpleGetter(this, 'name', json.title);
+    defineSimpleGetter(this, 'typeName', json.type_name);
 
+    var begin = timeUtils.parseDateTime(json.begin);
+    var end = timeUtils.parseDateTime(json.end);
+    defineSimpleGetter(this, 'begin', begin);
+    defineSimpleGetter(this, 'end', end);
+
+    var time = timeUtils.parseTimeDuration(json.nb_hour);
+    defineSimpleGetter(this, 'time', time);
+
+    // TODO
     this.events = [];
     for (var i = 0; i < json.events.length; i++) {
         var event = new Event(this, json.events[i]);
@@ -204,11 +118,10 @@ function Activity(module, json) {
 }
 
 Activity.prototype.toString = function () {
-    var s = ('shortName: ' + this.shortName + '\n' +
+    var s = ('id: ' + this.id + '\n' +
              'name: ' + this.name + '\n' +
              'typeName: ' + this.typeName + '\n' +
              'moduleName: ' + this.module.name + '\n' +
-             'moduleID: ' + this.module.getID() + '\n' +
              'begin: ' + this.begin.calendar() + '\n' +
              'end: ' + this.end.calendar() + '\n')
     return s;
@@ -220,34 +133,46 @@ Activity.prototype.contains = function (moment) {
 
 
 
-function Module(json) {
-    this.id = new ModuleID(json.scolaryear,
-                           json.codemodule,
-                           json.codeinstance);
+function Module(epitech, json) {
+    var id = new ModuleID(json.scolaryear,
+                          json.codemodule,
+                          json.codeinstance);
+    defineSimpleGetter(this, 'id', id);
 
-    this.name = json.title;
-    this.description = json.description;
-    this.skills = json.competence;
+    defineSimpleGetter(this, 'name', json.title);
+    defineSimpleGetter(this, 'description', json.description);
+    defineSimpleGetter(this, 'skills', json.competence);
+    defineSimpleGetter(this, 'credits', json.credits);
+    defineSimpleGetter(this, 'studentCredits', json.user_credits);
+    defineSimpleGetter(this, 'studentRegistered',
+                       json.student_registered === 1);
 
-    this.credits = json.credits;
-    this.studentCredits = json.user_credits;
-    this.studentRegistered = json.student_registered === 1;
+    var begin = json.begin === null ? null : timeUtils.parseDate(json.begin);
+    var end = json.begin === null ? null : timeUtils.parseDate(json.end);
 
-    this.begin = json.begin === null ? null : parseDate(json.begin);
-    this.end = json.begin === null ? null : parseDate(json.end);
+    defineSimpleGetter(this, 'begin', begin);
+    defineSimpleGetter(this, 'end', end);
 
-    this.activities = [];
+    var activitiesShortNames = [];
     for (var i = 0; i < json.activites.length; i++) {
-        var activity = new Activity(this, json.activites[i]);
-        this.activities.push(activity);
+        var activity = json.activites[i];
+        activitiesShortNames.push(activity.codeacti);
     }
+
+    var activitiesIDs = [];
+    for (var i = 0; i < activitiesShortNames.length; i++) {
+        var activity = new ActivityID(this.id, activitiesShortNames[i]);
+        activitiesIDs.push(activity);
+    }
+    defineSimpleGetter(this, 'activitiesIDs', activitiesIDs);
 }
 
-Module.prototype.getActivity = function (shortName) {
-    for (var i = 0; i < this.activities.length; i++) {
-        var activity = this.activities[i];
-        if (activity.shortName === shortName)
-            return activity;
+/** Returns an ActivityID or null */
+Module.prototype.getActivityID = function (shortName) {
+    for (var i = 0; i < this.activitiesIDs.length; i++) {
+        var id = this.activitiesIDs[i];
+        if (id.shortName === shortName)
+            return id;
     }
     return null;
 }
@@ -264,10 +189,10 @@ Module.prototype.toString = function () {
              'studentCredits: ' + this.studentCredits + '\n' +
              'studentRegistered: ' + this.studentRegistered + '\n');
 
-    s += 'activities:\n'
-    for (var i = 0; i < this.activities.length; i++) {
-        var activity = this.activities[i];
-        s += '    ' + activity.shortName + ' ' + activity.name + '\n';
+    s += 'activitiesIDs:\n'
+    for (var i = 0; i < this.activitiesIDs.length; i++) {
+        var id = this.activitiesIDs[i];
+        s += '    ' + id + '\n';
     }
     return s;
 }
@@ -289,52 +214,23 @@ Module.prototype.getEvents = function () {
     return events;
 }
 
-Module.get = function (session, moduleID, callback) {
+Module.get = function (epitech, moduleID, callback) {
     moduleID = ModuleID.create(moduleID);
 
     var path = 'module/' + moduleID
-    session.request(path, function (error, text) {
+    epitech.session.requestJSON(path, function (error, json) {
         if (error)
             return callback(error, null);
 
-        var json;
-        try {
-            json = JSON.parse(text);
-        } catch (e) {
-            return callback(e, null);
-        }
-
-        var module = new Module(json);
+        var module = new Module(epitech, json);
         callback(null, module);
     });
 }
 
-Module.getEpitechRequest = function (session, moduleID) {
-    var epitechRequest = new EpitechRequest(session);
-
-    Module.get(session, moduleID, function (error, module) {
-        if (error)
-            epitechRequest.fireEvent('error', error);
-        else {
-            epitechRequest.fireEnd(module);
-        }
-    });
-
-    return epitechRequest;
-}
-
 Module.getIDs = function (session, callback) {
-    session.request('course/filter', function (error, text) {
-
+    session.requestJSON('course/filter', function (error, json) {
         if (error)
             return callback(error, null);
-
-        var json;
-        try {
-            json = JSON.parse(text);
-        } catch (e) {
-            return callback(e, null);
-        }
 
         if (!Array.isArray(json))
             throw Error();
@@ -352,21 +248,59 @@ Module.getIDs = function (session, callback) {
 
 
 
-function Epitech(ownStudent, modules, json) {
-    this.ownStudent = ownStudent;
-    this.modules = modules;
+function Epitech(session, json) {
+    Model.call(this, this);
+
+    defineSimpleGetter(this, 'session', session);
+
+    /** If not null, this is a list of the IDs of some modules */
+    this._modulesIDs = null;
+
+    this._modules = [];
+    this._activities = [];
 }
 
-Epitech.prototype.getModule = function (id) {
-    for (var i = 0; i < this.modules.length; i++) {
-        var module = this.modules[i];
+Epitech.prototype.getModulesIDs = function (callback) {
+    if (this._modulesIDs !== null)
+        return callback(null, this._modulesIDs);
+
+    var self = this;
+    Module.getIDs(this.session, function (error, ids) {
+        if (error !== null)
+            return callback(error, null);
+
+        self._modulesIDs = ids;
+        callback(null, ids);
+    });
+}
+
+Epitech.prototype._getCachedModule = function (id) {
+    for (var i = 0; i < this._modules.length; i++) {
+        var module = this._modules[i];
         if (module.id.equals(id))
             return module;
     }
     return null;
 }
 
-Epitech.prototype.getActivity = function (shortName) {
+Epitech.prototype.getModule = function (id, callback) {
+    var module = this._getCachedModule(id);
+    if (module !== null)
+        return callback(null, module);
+
+    var self = this;
+    Module.get(this, id, function (error, module) {
+        if (error !== null)
+            return callback(error, null);
+
+        self._modules.push(module);
+        callback(null, module);
+    });
+}
+
+/*
+
+Epitech.prototype.getActivity = function (id) {
     for (var i = 0; i < this.modules.length; i++) {
         var module = this.modules[i];
         var activity = module.getActivity(shortName);
@@ -375,51 +309,28 @@ Epitech.prototype.getActivity = function (shortName) {
     }
     return null;
 }
-
-Epitech.prototype.getActivities = function () {
-    var activities = [];
-    for (var i = 0; i < this.modules.length; i++) {
-        var module = this.modules[i];
-        activities = activities.concat(module.activities);
-    }
-    return activities;
-}
-
-Epitech.prototype.getEvents = function () {
-    var events = [];
-    for (var i = 0; i < this.modules.length; i++) {
-        var module = this.modules[i];
-        events = events.concat(module.getEvents());
-    }
-    return events;
-}
-
-Epitech.getModules = function (parentRequest, modulesIDs) {
-    for (var i = 0; i < modulesIDs.length; i++) {
-        var id = modulesIDs[i];
-        var request = Module.getEpitechRequest(parentRequest.session, id);
-        parentRequest.addChildRequest(request);
-    }
-}
+*/
 
 Epitech.getJSON = function (session, callback) {
-    session.request('', function (error, text) {
-
-        if (error) {
+    session.requestJSON('', function (error, text) {
+        if (error)
             return callback(error, null);
-        }
 
-        var json;
-        try {
-            json = JSON.parse(text);
-        } catch (e) {
-            return callback(e, null);
-        }
-
-        callback(null, json);
+        callback(null, text);
     });
 }
 
+Epitech.get = function (session, callback) {
+    Epitech.getJSON(session, function (error, json) {
+        if (error)
+            return callback(error, null);
+
+        var epitech = new Epitech(session, json);
+        callback(null, epitech);
+    });
+}
+
+/*
 Epitech.getEpitechRequest = function (session) {
     var epitechRequest = new EpitechRequest(session);
     var modulesIDs = null;
@@ -462,14 +373,15 @@ Epitech.getEpitechRequest = function (session) {
 
     return epitechRequest;
 }
+*/
 
 
 
 module.exports = {
     timeUtils: timeUtils,
 
+    ActivityID: ActivityID,
     Epitech: Epitech,
-    EpitechRequest: EpitechRequest,
     Event: Event,
     Module: Module,
     ModuleID: ModuleID,

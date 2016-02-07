@@ -39,9 +39,33 @@ function filterEventsInWeek(weekBegin, events) {
 }
 
 
+function parseDate(string) {
+    var m = Moment(string, 'YYYY-MM-DD');
+    if (!m.isValid())
+        throw new Error('Invalid date');
+    return m;
+}
+
+function parseTimeDuration(string) {
+    var m = Moment.duration(string, 'HH:mm:ss');
+    return m;
+}
+
+function parseDateTime(string) {
+    var m = Moment(string, 'YYYY-MM-DD HH:mm:ss');
+    if (!m.isValid())
+        throw new Error('Invalid date');
+    return m;
+}
+
+
 module.exports = {
     isBetweenInc: isBetweenInc,
     filterEvents: filterEvents,
     filterEventsInDay: filterEventsInDay,
     filterEventsInWeek: filterEventsInWeek,
+
+    parseDate: parseDate,
+    parseTimeDuration: parseTimeDuration,
+    parseDateTime: parseDateTime,
 };
